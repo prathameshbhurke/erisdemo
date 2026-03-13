@@ -1,26 +1,31 @@
+import os
+import ssl
 import anthropic
 import redshift_connector
 import json
-from datetime import datetime
 import sendgrid
 from sendgrid.helpers.mail import Mail
-import ssl
+from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# API Keys
-ANTHROPIC_API_KEY = "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"
-SENDGRID_API_KEY = "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"
+# API Keys from environment variables
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
+TO_EMAIL = os.getenv("SENDGRID_TO_EMAIL")
 
-# Email settings
-FROM_EMAIL = "bhurkeprathamesh@gmail.com"
-TO_EMAIL = "reshma.prathamesh@gmail.com"  # Who receives the report
-
+# Redshift connection from environment variables
 REDSHIFT_CONFIG = {
-    'host': 'ecommerce-workgroup.680019129594.us-east-1.redshift-serverless.amazonaws.com',
-    'database': 'dev',
-    'port': 5439,
-    'user': 'admin',
-    'password': 'DragonDaima2026'
+    'host': os.getenv("REDSHIFT_HOST"),
+    'database': os.getenv("REDSHIFT_DB"),
+    'port': int(os.getenv("REDSHIFT_PORT", 5439)),
+    'user': os.getenv("REDSHIFT_USER"),
+    'password': os.getenv("REDSHIFT_PASSWORD")
 }
 
 def get_pipeline_stats():
@@ -32,8 +37,8 @@ def get_pipeline_stats():
     total_orders = cursor.fetchone()[0]
 
     cursor.execute("""
-        SELECT status, COUNT(*) as count 
-        FROM fct_orders 
+        SELECT status, COUNT(*) as count
+        FROM fct_orders
         GROUP BY status
     """)
     status_breakdown = cursor.fetchall()
@@ -98,7 +103,6 @@ def send_email(report, stats):
     """Send the AI report via SendGrid"""
     sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
 
-    # Build HTML email
     html_content = f"""
     <html>
     <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -106,7 +110,7 @@ def send_email(report, stats):
             <h1 style="color: white; margin: 0;">📊 Daily Pipeline Report</h1>
             <p style="color: #ccc; margin: 5px 0 0 0;">{datetime.now().strftime('%B %d, %Y')}</p>
         </div>
-        
+
         <div style="background-color: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px;">
             <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                 <h2 style="color: #2E4B8F;">AI Summary</h2>
@@ -141,7 +145,7 @@ def send_email(report, stats):
         </div>
 
         <p style="color: #888; font-size: 12px; text-align: center; margin-top: 20px;">
-            Powered by your Data Pipeline — Automated by AI
+            Powered by Eris Solutions — Automated by AI
         </p>
     </body>
     </html>

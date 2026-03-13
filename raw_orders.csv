@@ -1,0 +1,6 @@
+order_id,customer_id,order_date,status,amount
+1001,C001,2024-01-15 08:23:11,completed,150.00
+1002,C002,2024-01-15 09:11:45,cancelled,89.99
+1003,C001,2024-01-16 14:05:22,completed,230.50
+1004,C003,2024-01-17 11:30:00,completed,310.00
+1005,C002,2024-01-18 16:45:55,pending,75.00
