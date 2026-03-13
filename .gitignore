@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual Environment
+dbt-env/
+venv/
+.env
+
+# dbt
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# Airflow
+airflow/logs/
+airflow/plugins/
+
+# Environment variables (NEVER commit these)
+.env
+*.env
+config/secrets.yml
+
+# Mac
+.DS_Store
+
+# VS Code
+.vscode/settings.json
+
+# Great Expectations
+great_expectations/uncommitted/
