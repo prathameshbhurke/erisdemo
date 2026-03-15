@@ -1,18 +1,37 @@
-import os
-import redshift_connector
-import requests
 import ssl
-from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
-from dotenv import load_dotenv
+import os
 
-load_dotenv()
-
-# Local dev SSL fix
 if os.getenv("ENVIRONMENT", "development") == "development":
     ssl._create_default_https_context = ssl._create_unverified_context
 
-# ── Redshift Tool ──────────────────────────────────────────────────────────────
+import redshift_connector
+import requests
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+from dotenv import load_dotenv
+import uuid
+from datetime import datetime
+
+load_dotenv()
+
+
+def load_prompt(agent_name: str) -> str:
+    """Load agent prompt from file — allows runtime updates via UI"""
+    prompt_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "prompts",
+        f"{agent_name}_prompt.txt"
+    )
+    try:
+        with open(prompt_path, 'r') as f:
+            content = f.read()
+            print(f"✅ Loaded {agent_name} prompt ({len(content)} chars)")
+            return content
+    except FileNotFoundError:
+        print(f"⚠️ Prompt file not found for {agent_name}")
+        return f"You are an intelligent {agent_name} agent for Eris Solutions."
+
+
 def query_redshift(sql: str) -> list:
     """Execute a SQL query against Redshift and return results"""
     conn = redshift_connector.connect(
@@ -29,7 +48,7 @@ def query_redshift(sql: str) -> list:
     conn.close()
     return [dict(zip(columns, row)) for row in rows]
 
-# ── Airflow Tool ───────────────────────────────────────────────────────────────
+
 def get_dag_status(dag_id: str) -> dict:
     """Get the latest run status of an Airflow DAG"""
     url = f"http://localhost:8080/api/v1/dags/{dag_id}/dagRuns"
@@ -54,7 +73,7 @@ def get_dag_status(dag_id: str) -> dict:
     except Exception as e:
         return {"dag_id": dag_id, "state": "error", "error": str(e)}
 
-# ── Slack Tool ─────────────────────────────────────────────────────────────────
+
 def post_to_slack(channel: str, message: str, color: str = None) -> bool:
     """Post a message to a Slack channel"""
     client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
@@ -77,6 +96,34 @@ def post_to_slack(channel: str, message: str, color: str = None) -> bool:
     except SlackApiError as e:
         print(f"Slack error: {e.response['error']}")
         return False
+
+
+def log_agent_activity(agent_name: str, status: str, summary: str, slack_channel: str):
+    """Log agent run to Redshift for dashboard tracking"""
+    conn = redshift_connector.connect(
+        host=os.getenv("REDSHIFT_HOST"),
+        database=os.getenv("REDSHIFT_DB"),
+        port=int(os.getenv("REDSHIFT_PORT", 5439)),
+        user=os.getenv("REDSHIFT_USER"),
+        password=os.getenv("REDSHIFT_PASSWORD")
+    )
+    conn.autocommit = True
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO agent_activity_log
+            (log_id, agent_name, run_time, status, summary, slack_channel)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (
+        str(uuid.uuid4())[:50],
+        agent_name,
+        datetime.now(),
+        status,
+        summary[:500],
+        slack_channel
+    ))
+    conn.close()
+    print(f"✅ Activity logged for {agent_name}")
+
 
 # ── Tool Definitions for Claude ────────────────────────────────────────────────
 TOOLS = [
@@ -124,13 +171,40 @@ TOOLS = [
                 },
                 "color": {
                     "type": "string",
-                    "description": "Optional color for the message attachment: good (green), warning (yellow), danger (red)"
+                    "description": "Optional color: good (green), warning (yellow), danger (red)"
                 }
             },
             "required": ["channel", "message"]
         }
+    },
+    {
+        "name": "log_agent_activity",
+        "description": "Log the agent's activity to Redshift for dashboard tracking. Call this at the end of every run with a summary of what was found.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "agent_name": {
+                    "type": "string",
+                    "description": "Name of the agent e.g. Pipeline Monitor, Data Quality, Business Insights"
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Status of the run: success, warning, or failure"
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Brief summary of findings (max 500 chars)"
+                },
+                "slack_channel": {
+                    "type": "string",
+                    "description": "Slack channel where results were posted"
+                }
+            },
+            "required": ["agent_name", "status", "summary", "slack_channel"]
+        }
     }
 ]
+
 
 def execute_tool(tool_name: str, tool_input: dict):
     """Execute a tool by name with given input"""
@@ -143,6 +217,13 @@ def execute_tool(tool_name: str, tool_input: dict):
             tool_input["channel"],
             tool_input["message"],
             tool_input.get("color")
+        )
+    elif tool_name == "log_agent_activity":
+        return log_agent_activity(
+            tool_input["agent_name"],
+            tool_input["status"],
+            tool_input["summary"],
+            tool_input["slack_channel"]
         )
     else:
         return {"error": f"Unknown tool: {tool_name}"}

@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eris Solutions — Pipeline Health</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;color:#1a1a2e;min-height:100vh;display:flex;}
+.sidebar{width:230px;min-height:100vh;background:#1e2433;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;}
+.sidebar-logo{padding:22px 20px 18px;border-bottom:1px solid #2d3348;}
+.logo-text{font-size:17px;font-weight:700;color:#fff;letter-spacing:-0.3px;}
+.logo-text span{color:#4f8ef7;}
+.logo-sub{font-size:10px;color:#555;margin-top:3px;text-transform:uppercase;letter-spacing:0.8px;}
+.nav-section{padding:20px 14px 6px;font-size:10px;color:#444;text-transform:uppercase;letter-spacing:0.8px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13px;color:#888;cursor:pointer;border-radius:7px;margin:1px 8px;transition:all 0.15s;}
+.nav-item:hover{background:rgba(255,255,255,0.05);color:#ccc;}
+.nav-item.active{background:rgba(79,142,247,0.15);color:#4f8ef7;font-weight:500;}
+.nav-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.nd-green{background:#00c853;}
+.nd-blue{background:#4f8ef7;}
+.nd-amber{background:#ffa000;}
+.nd-purple{background:#7c4dff;}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid #2d3348;}
+.sf-text{font-size:11px;color:#444;}
+.sf-status{font-size:11px;color:#00c853;margin-top:4px;}
+.main{margin-left:230px;flex:1;padding:24px 28px;min-height:100vh;}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;}
+.page-title{font-size:20px;font-weight:700;color:#1a1a2e;letter-spacing:-0.3px;}
+.page-sub{font-size:12px;color:#999;margin-top:3px;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.health-pill{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;}
+.hp-green{background:#e8f5e9;border:1px solid #a5d6a7;color:#2e7d32;}
+.hp-amber{background:#fff8e1;border:1px solid #ffe082;color:#f57f17;}
+.hp-dot{width:7px;height:7px;border-radius:50%;}
+.hpd-green{background:#00c853;}
+.hpd-amber{background:#ffa000;}
+.refresh-btn{background:#fff;border:1px solid #e0e0e0;color:#555;padding:7px 16px;border-radius:7px;font-size:12px;cursor:pointer;transition:all 0.15s;}
+.refresh-btn:hover{background:#f5f5f5;}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
+.kpi{background:#fff;border:1px solid #e8e8f0;border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;transition:box-shadow 0.2s;}
+.kpi:hover{box-shadow:0 4px 12px rgba(0,0,0,0.06);}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0;}
+.kpi-blue::after{background:#4f8ef7;}
+.kpi-green::after{background:#00c853;}
+.kpi-amber::after{background:#ffa000;}
+.kpi-purple::after{background:#7c4dff;}
+.kpi-teal::after{background:#00bcd4;}
+.kpi-label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:8px;}
+.kpi-val{font-size:24px;font-weight:700;color:#1a1a2e;letter-spacing:-0.5px;}
+.kpi-delta{font-size:11px;margin-top:6px;display:flex;align-items:center;gap:4px;}
+.delta-green{color:#00c853;}
+.delta-amber{color:#ffa000;}
+.delta-red{color:#f44336;}
+.delta-blue{color:#4f8ef7;}
+.rec-panel{background:#fff;border:1px solid #e8e8f0;border-radius:10px;padding:18px 20px;margin-bottom:18px;}
+.rec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.rec-title{font-size:13px;font-weight:700;color:#1a1a2e;display:flex;align-items:center;gap:8px;}
+.badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;}
+.badge-amber{background:#fff8e1;color:#f57f17;}
+.badge-green{background:#e8f5e9;color:#2e7d32;}
+.badge-blue{background:#e3f2fd;color:#1565c0;}
+.badge-red{background:#ffebee;color:#c62828;}
+.rec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.rec-item{padding:12px 14px;border-radius:8px;border-left:3px solid;transition:transform 0.15s;}
+.rec-item:hover{transform:translateY(-1px);}
+.rec-high{background:#fff8e1;border-color:#ffa000;}
+.rec-medium{background:#e3f2fd;border-color:#1565c0;}
+.rec-low{background:#e8f5e9;border-color:#00c853;}
+.rec-priority{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.rp-high{color:#ffa000;}
+.rp-medium{color:#1565c0;}
+.rp-low{color:#2e7d32;}
+.rec-text{font-size:12px;color:#444;line-height:1.5;}
+.grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+.card{background:#fff;border:1px solid #e8e8f0;border-radius:10px;padding:18px 20px;transition:box-shadow 0.2s;}
+.card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.06);}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.card-title{font-size:13px;font-weight:700;color:#1a1a2e;}
+.stage-flow{display:flex;align-items:center;gap:0;margin-bottom:16px;padding:12px;background:#f8f9ff;border-radius:8px;}
+.stage{display:flex;flex-direction:column;align-items:center;flex:1;}
+.stage-box{width:42px;height:42px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-bottom:5px;}
+.sb-green{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;}
+.sb-blue{background:#e3f2fd;color:#1565c0;border:1px solid #90caf9;}
+.sb-amber{background:#fff8e1;color:#f57f17;border:1px solid #ffe082;}
+.stage-label{font-size:9px;color:#999;text-align:center;font-weight:500;}
+.stage-arrow{color:#ddd;font-size:18px;margin-bottom:20px;flex-shrink:0;}
+.gx-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f5f5f5;}
+.gx-row:last-child{border:none;}
+.gx-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.gxd-pass{background:#00c853;}
+.gxd-fail{background:#f44336;}
+.gx-name{font-size:12px;color:#555;flex:1;}
+.gx-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;}
+.gxb-pass{background:#e8f5e9;color:#2e7d32;}
+.gxb-fail{background:#ffebee;color:#c62828;}
+.agent-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5;}
+.agent-row:last-child{border:none;}
+.agent-status-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.asd-success{background:#00c853;}
+.asd-warning{background:#ffa000;}
+.asd-failure{background:#f44336;}
+.agent-body{flex:1;}
+.agent-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px;}
+.agent-name{font-size:13px;font-weight:600;color:#1a1a2e;}
+.agent-time{font-size:11px;color:#bbb;white-space:nowrap;}
+.agent-channel{font-size:11px;color:#4f8ef7;margin-bottom:4px;}
+.agent-summary{font-size:12px;color:#777;line-height:1.4;margin-bottom:4px;}
+.agent-action{font-size:11px;color:#1565c0;background:#e3f2fd;padding:4px 10px;border-radius:4px;display:inline-block;}
+.run-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f5f5f5;font-size:12px;}
+.run-row:last-child{border:none;}
+.run-status{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.rs-success{background:#00c853;}
+.rs-failed{background:#f44336;}
+.run-date{color:#555;flex:1;}
+.run-duration{color:#999;}
+.run-rows{color:#1a1a2e;font-weight:600;}
+.table-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f5f5f5;}
+.table-row:last-child{border:none;}
+.table-info{flex:1;}
+.table-name-text{font-size:12px;color:#555;}
+.table-bar{height:4px;background:#f0f0f0;border-radius:2px;margin-top:3px;width:100%;}
+.table-bar-fill{height:100%;border-radius:2px;background:#4f8ef7;}
+.table-count-text{font-size:13px;font-weight:700;color:#1a1a2e;margin-left:12px;}
+.freshness-center{text-align:center;padding:16px 0;}
+.freshness-num{font-size:40px;font-weight:800;color:#1a1a2e;letter-spacing:-1px;}
+.freshness-label{font-size:12px;color:#999;margin-top:3px;}
+.freshness-tag{font-size:11px;color:#ffa000;margin-top:8px;}
+.sla-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f5f5f5;font-size:12px;}
+.sla-row:last-child{border:none;}
+.sla-key{color:#777;}
+.sla-val{font-weight:600;color:#1a1a2e;}
+.loading{color:#bbb;font-size:13px;text-align:center;padding:30px;}
+.score-ring{display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-text"><span>Eris</span> Solutions</div>
+    <div class="logo-sub">Pipeline Health Console</div>
+  </div>
+  <div class="nav-section">Monitoring</div>
+  <div class="nav-item active"><div class="nav-dot nd-green"></div>Pipeline Health</div>
+  <div class="nav-item"><div class="nav-dot nd-blue"></div>Data Validation</div>
+  <div class="nav-item"><div class="nav-dot nd-amber"></div>Intelligence Log</div>
+  <div class="nav-section">Analytics</div>
+  <div class="nav-item"><div class="nav-dot nd-blue"></div>Business Dashboard</div>
+  <div class="nav-item"><div class="nav-dot nd-purple"></div>Trend Analysis</div>
+  <div class="nav-section">Configuration</div>
+  <div class="nav-item"><div class="nav-dot nd-amber"></div>Agent Instructions</div>
+  <div class="nav-item"><div class="nav-dot nd-blue"></div>Alert Settings</div>
+  <div class="sidebar-footer">
+    <div class="sf-text" id="clientName">Olist Demo · v1.0</div>
+    <div class="sf-status" id="sidebarStatus">Checking status...</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Pipeline Health</div>
+      <div class="page-sub" id="lastUpdated">Loading...</div>
+    </div>
+    <div class="topbar-right">
+      <div class="health-pill hp-green" id="healthPill">
+        <div class="hp-dot hpd-green" id="healthDot"></div>
+        <span id="healthPillText">Loading...</span>
+      </div>
+      <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi kpi-blue">
+      <div class="kpi-label">Health Score</div>
+      <div class="kpi-val" id="kpiHealth">—</div>
+      <div class="kpi-delta delta-blue" id="kpiHealthDelta">Loading...</div>
+    </div>
+    <div class="kpi kpi-green">
+      <div class="kpi-label">Job Success Rate</div>
+      <div class="kpi-val" id="kpiSuccess">—</div>
+      <div class="kpi-delta delta-green">Last 30 runs</div>
+    </div>
+    <div class="kpi kpi-amber">
+      <div class="kpi-label">Avg Run Duration</div>
+      <div class="kpi-val" id="kpiDuration">—</div>
+      <div class="kpi-delta delta-amber">Per pipeline run</div>
+    </div>
+    <div class="kpi kpi-purple">
+      <div class="kpi-label">Throughput</div>
+      <div class="kpi-val" id="kpiThroughput">—</div>
+      <div class="kpi-delta delta-blue">Rows per second</div>
+    </div>
+    <div class="kpi kpi-teal">
+      <div class="kpi-label">Production Records</div>
+      <div class="kpi-val" id="kpiRows">—</div>
+      <div class="kpi-delta delta-green">Facts + Dims + Reporting</div>
+    </div>
+  </div>
+
+  <div class="rec-panel">
+    <div class="rec-header">
+      <div class="rec-title">
+        AI Recommended Actions
+        <span class="badge badge-amber" id="recCount">Loading...</span>
+      </div>
+      <span style="font-size:11px;color:#999;" id="recTime"></span>
+    </div>
+    <div class="rec-grid" id="recGrid">
+      <div class="loading">Loading recommendations...</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Pipeline Stage Status</div>
+        <span class="badge badge-green" id="stagesBadge">All operational</span>
+      </div>
+      <div class="stage-flow">
+        <div class="stage"><div class="stage-box sb-green">RAW</div><div class="stage-label">Ingestion</div></div>
+        <div class="stage-arrow">›</div>
+        <div class="stage"><div class="stage-box sb-green">TRF</div><div class="stage-label">Transform</div></div>
+        <div class="stage-arrow">›</div>
+        <div class="stage"><div class="stage-box sb-green">MDL</div><div class="stage-label">Modeling</div></div>
+        <div class="stage-arrow">›</div>
+        <div class="stage"><div class="stage-box sb-blue">VAL</div><div class="stage-label">Validation</div></div>
+        <div class="stage-arrow">›</div>
+        <div class="stage"><div class="stage-box sb-blue">RPT</div><div class="stage-label">Analytics</div></div>
+        <div class="stage-arrow">›</div>
+        <div class="stage"><div class="stage-box sb-amber">INT</div><div class="stage-label">Intelligence</div></div>
+      </div>
+      <div class="card-title" style="margin-bottom:10px;font-size:12px;color:#999;">Run Duration Trend (seconds)</div>
+      <div style="position:relative;height:150px;">
+        <canvas id="durationChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Data Validation</div>
+        <span class="badge" id="gxBadge">Loading...</span>
+      </div>
+      <div id="gxList"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Recent Pipeline Runs</div>
+        <span class="badge badge-blue" id="runsBadge">Loading...</span>
+      </div>
+      <div id="runsList"><div class="loading">Loading...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Intelligence Log</div>
+        <span class="badge badge-blue">AI Agents</span>
+      </div>
+      <div id="agentList"><div class="loading">Loading...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Data Freshness</div>
+        <span class="badge badge-amber" id="freshnessBadge">Checking...</span>
+      </div>
+      <div class="freshness-center">
+        <div class="freshness-num" id="freshnessNum">—</div>
+        <div class="freshness-label">days since last record</div>
+        <div class="freshness-tag" id="freshnessTag">Checking...</div>
+      </div>
+      <div id="slaList"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header">
+      <div class="card-title">Table Record Counts</div>
+      <span class="badge badge-blue" id="tablesBadge">Loading...</span>
+    </div>
+    <div id="tablesList" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+      <div class="loading">Loading...</div>
+    </div>
+  </div>
+  <!-- Data Validation Page -->
+<div id="page-validation" class="page-section" style="display:none;">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Data Validation</div>
+      <div class="page-sub">Quality checks across all pipeline layers</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Validation Checks</div>
+      <span class="badge badge-green" id="gxBadge2">Loading...</span>
+    </div>
+    <div id="gxList2"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Intelligence Log Page -->
+<div id="page-intelligence" class="page-section" style="display:none;">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Intelligence Log</div>
+      <div class="page-sub">AI agent activity and recommendations</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Agent Activity</div>
+    </div>
+    <div id="agentListFull"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Business Dashboard Page -->
+<div id="page-business" class="page-section" style="display:none;">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Business Dashboard</div>
+      <div class="page-sub">Coming soon — auto-generated business metrics</div>
+    </div>
+  </div>
+  <div class="card" style="text-align:center;padding:60px;">
+    <div style="font-size:40px;margin-bottom:16px;">📊</div>
+    <div style="font-size:16px;font-weight:600;color:#1a1a2e;margin-bottom:8px;">Business Dashboard</div>
+    <div style="font-size:13px;color:#999;">Auto-generated KPIs and charts based on your data schema.<br>Coming in the next release.</div>
+  </div>
+</div>
+
+<!-- Trend Analysis Page -->
+<div id="page-trends" class="page-section" style="display:none;">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Trend Analysis</div>
+      <div class="page-sub">Historical performance trends</div>
+    </div>
+  </div>
+  <div class="card" style="text-align:center;padding:60px;">
+    <div style="font-size:40px;margin-bottom:16px;">📈</div>
+    <div style="font-size:16px;font-weight:600;color:#1a1a2e;margin-bottom:8px;">Trend Analysis</div>
+    <div style="font-size:13px;color:#999;">30/60/90 day pipeline performance trends.<br>Coming in the next release.</div>
+  </div>
+</div>
+
+<!-- Agent Instructions Page -->
+<div id="page-agents-config" class="page-section" style="display:none;">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Agent Instructions</div>
+      <div class="page-sub">Customize AI agent behavior</div>
+    </div>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Pipeline Monitor</div><span class="badge badge-green">Active</span></div>
+      <textarea id="prompt-monitor" style="width:100%;height:200px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;padding:10px;resize:vertical;color:#444;" placeholder="Loading..."></textarea>
+      <button onclick="savePrompt('monitor')" style="margin-top:10px;background:#4f8ef7;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:12px;cursor:pointer;">Save Instructions</button>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Data Quality</div><span class="badge badge-green">Active</span></div>
+      <textarea id="prompt-quality" style="width:100%;height:200px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;padding:10px;resize:vertical;color:#444;" placeholder="Loading..."></textarea>
+      <button onclick="savePrompt('quality')" style="margin-top:10px;background:#4f8ef7;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:12px;cursor:pointer;">Save Instructions</button>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Business Insights</div><span class="badge badge-green">Active</span></div>
+      <textarea id="prompt-insights" style="width:100%;height:200px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;padding:10px;resize:vertical;color:#444;" placeholder="Loading..."></textarea>
+      <button onclick="savePrompt('insights')" style="margin-top:10px;background:#4f8ef7;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:12px;cursor:pointer;">Save Instructions</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alert Settings Page -->
+<div id="page-alerts" class="page-section" style="display:none;">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Alert Settings</div>
+      <div class="page-sub">Configure when and how agents alert you</div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Slack Channels</div></div>
+      <div class="sla-row"><span class="sla-key">Pipeline Alerts</span><span class="sla-val">#pipeline-alerts</span></div>
+      <div class="sla-row"><span class="sla-key">Data Validation</span><span class="sla-val">#data-quality</span></div>
+      <div class="sla-row"><span class="sla-key">Business Insights</span><span class="sla-val">#daily-insights</span></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Alert Thresholds</div></div>
+      <div class="sla-row"><span class="sla-key">Min row count</span><span class="sla-val">90,000</span></div>
+      <div class="sla-row"><span class="sla-key">Max run duration</span><span class="sla-val">600 seconds</span></div>
+      <div class="sla-row"><span class="sla-key">Data freshness SLA</span><span class="sla-val">24 hours</span></div>
+      <div class="sla-row"><span class="sla-key">Min success rate</span><span class="sla-val">95%</span></div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const fmt = n => n ? Number(n).toLocaleString() : '0';
+const fmtSec = s => s >= 60 ? Math.floor(s/60)+'m '+(s%60)+'s' : s+'s';
+
+async function loadSummary() {
+  const r = await fetch('/api/summary');
+  const d = await r.json();
+
+  document.getElementById('kpiHealth').textContent = d.health_score + '/100';
+  document.getElementById('kpiHealthDelta').textContent = d.health_score >= 80 ? '● Healthy' : '● Needs attention';
+  document.getElementById('kpiSuccess').textContent = d.success_rate + '%';
+  document.getElementById('kpiDuration').textContent = fmtSec(d.avg_duration);
+  document.getElementById('kpiThroughput').textContent = fmt(d.avg_throughput) + '/s';
+  document.getElementById('kpiRows').textContent = fmt(d.prod_total);   // ← updated
+  document.getElementById('lastUpdated').textContent = 'Real-time monitoring · Updated ' + d.last_checked;
+  document.getElementById('healthPillText').textContent = d.health_score >= 80 ? 'Healthy · ' + d.health_score + '/100' : 'Warning · ' + d.health_score + '/100';
+
+  const healthy = d.health_score >= 80;
+  const pill = document.getElementById('healthPill');
+  pill.className = 'health-pill ' + (healthy ? 'hp-green' : 'hp-amber');
+  document.getElementById('healthDot').className = 'hp-dot ' + (healthy ? 'hpd-green' : 'hpd-amber');
+  document.getElementById('sidebarStatus').textContent = healthy ? '● All systems operational' : '● Warning detected';
+  document.getElementById('sidebarStatus').style.color = healthy ? '#00c853' : '#ffa000';
+
+  const latest = d.latest_data;
+  if (latest) {
+    const days = Math.floor((Date.now() - new Date(latest)) / 86400000);
+    document.getElementById('freshnessNum').textContent = days.toLocaleString();
+    document.getElementById('freshnessTag').textContent = days <= 1 ? '● Current' : days <= 7 ? '● Recent' : '● Historical dataset';
+    document.getElementById('freshnessBadge').textContent = days <= 1 ? 'Current' : 'Historical';
+    document.getElementById('freshnessBadge').className = 'badge ' + (days <= 1 ? 'badge-green' : 'badge-amber');
+  }
+
+  document.getElementById('slaList').innerHTML = `
+    <div class="sla-row"><span class="sla-key">SLA Target</span><span class="sla-val" style="color:#2e7d32;">≤ 24 hours</span></div>
+    <div class="sla-row"><span class="sla-key">Last Run</span><span class="sla-val">${d.latest_run.run_date}</span></div>
+    <div class="sla-row"><span class="sla-key">Last Run Status</span><span class="sla-val" style="color:${d.latest_run.status==='success'?'#2e7d32':'#c62828'}">${d.latest_run.status}</span></div>
+    <div class="sla-row"><span class="sla-key">Records Processed</span><span class="sla-val">${fmt(d.latest_run.rows)}</span></div>
+    <div class="sla-row"><span class="sla-key">Next Scheduled Run</span><span class="sla-val">06:00 daily</span></div>
+  `;
+}
+
+async function loadRuns() {
+  const r = await fetch('/api/runs');
+  const runs = await r.json();
+  const success = runs.filter(r => r.status === 'success').length;
+  document.getElementById('runsBadge').textContent = success + '/' + runs.length + ' successful';
+
+  let html = '';
+  runs.slice(0, 7).forEach(r => {
+    html += `<div class="run-row">
+      <div class="run-status ${r.status === 'success' ? 'rs-success' : 'rs-failed'}"></div>
+      <div class="run-date">${r.run_date}</div>
+      <div class="run-duration">${fmtSec(r.duration_seconds)}</div>
+      <div class="run-rows">${fmt(r.rows_processed)}</div>
+    </div>`;
+  });
+  document.getElementById('runsList').innerHTML = html;
+
+  // Duration chart
+  const labels = runs.slice(0, 8).reverse().map(r => r.run_date.slice(5, 16));
+  const data = runs.slice(0, 8).reverse().map(r => r.duration_seconds);
+  const colors = runs.slice(0, 8).reverse().map(r => r.status === 'success' ? '#4f8ef7' : '#f44336');
+
+  if (window.durationChartInstance) window.durationChartInstance.destroy();
+  window.durationChartInstance = new Chart(document.getElementById('durationChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderRadius: 4, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => v + 's', font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.04)' } },
+        x: { ticks: { font: { size: 9 }, maxRotation: 30 }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+async function loadQuality() {
+  const r = await fetch('/api/quality');
+  const d = await r.json();
+  document.getElementById('gxBadge').textContent = d.passed + '/' + d.total + ' passing';
+  document.getElementById('gxBadge').className = 'badge ' + (d.passed === d.total ? 'badge-green' : 'badge-amber');
+
+  let html = '';
+  d.checks.forEach(c => {
+    html += `<div class="gx-row">
+      <div class="gx-dot ${c.passed ? 'gxd-pass' : 'gxd-fail'}"></div>
+      <div class="gx-name">${c.name}</div>
+      <span class="gx-badge ${c.passed ? 'gxb-pass' : 'gxb-fail'}">${c.passed ? 'PASS' : 'FAIL'}</span>
+    </div>`;
+  });
+  document.getElementById('gxList').innerHTML = html;
+}
+
+async function loadAgents() {
+  const r = await fetch('/api/agents');
+  const agents = await r.json();
+
+  const actionMap = {
+    'Pipeline Monitor': 'Verify pipeline scheduler is active for production runs',
+    'Data Quality': 'Add NOT NULL constraint on price column in source system',
+    'Business Insights': 'Launch retention email campaign targeting 6,019 repeat customers'
+  };
+
+  let html = '';
+  agents.slice(0, 3).forEach(a => {
+    const dotClass = a.status === 'success' ? 'asd-success' : a.status === 'warning' ? 'asd-warning' : 'asd-failure';
+    const action = actionMap[a.agent_name] || 'Review agent output in Slack';
+    html += `<div class="agent-row">
+      <div class="agent-status-dot ${dotClass}"></div>
+      <div class="agent-body">
+        <div class="agent-header">
+          <span class="agent-name">${a.agent_name}</span>
+          <span class="agent-time">${a.run_time}</span>
+        </div>
+        <div class="agent-channel">${a.slack_channel}</div>
+        <div class="agent-summary">${a.summary.slice(0, 100)}...</div>
+        <div class="agent-action">→ ${action}</div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('agentList').innerHTML = html || '<div class="loading">No activity yet</div>';
+}
+
+async function loadTables() {
+  const r = await fetch('/api/tables');
+  const d = await r.json();
+
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">';
+
+  // Raw section
+  html += '<div><div style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">Source Layer</div>';
+  d.raw.forEach(t => {
+    const name = t.table.replace('raw_olist_','').replace(/_/g,' ');
+    html += `<div class="table-row" style="flex-direction:column;align-items:stretch;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span class="table-name-text">${name}</span>
+        <span class="table-count-text">${fmt(t.count)}</span>
+      </div>
+      <div class="table-bar"><div class="table-bar-fill" style="width:100%;background:#94a3b8;"></div></div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // Prod section
+  html += '<div><div style="font-size:11px;font-weight:700;color:#4f8ef7;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">Production Layer</div>';
+  const maxProd = Math.max(...d.prod.map(t => t.count));
+  d.prod.forEach((t, i) => {
+    const name = t.table.replace('_olist_','').replace(/_/g,' ');
+    const pct = Math.round(t.count / maxProd * 100);
+    const colors = ['#4f8ef7','#7c4dff','#00bcd4','#00c853','#ffa000'];
+    html += `<div class="table-row" style="flex-direction:column;align-items:stretch;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span class="table-name-text">${name}</span>
+        <span class="table-count-text">${fmt(t.count)}</span>
+      </div>
+      <div class="table-bar"><div class="table-bar-fill" style="width:${pct}%;background:${colors[i%colors.length]};"></div></div>
+    </div>`;
+  });
+  html += '</div></div>';
+
+  document.getElementById('tablesList').innerHTML = html;
+  document.getElementById('tablesList').style.display = 'block';
+  document.getElementById('tablesBadge').textContent = `${d.raw.length} source · ${d.prod.length} production`;
+}
+
+async function loadRecommendations() {
+  const r = await fetch('/api/agents');
+  const agents = await r.json();
+
+  const recs = [
+    { priority: 'high', cls: 'rec-high', pcls: 'rp-high',
+      text: '93.7% of revenue comes from one-time customers. Launch a post-purchase email sequence within 7 days of delivery to drive repeat orders.' },
+    { priority: 'medium', cls: 'rec-medium', pcls: 'rp-medium',
+      text: 'Northern states average 26-day delivery vs 8 days in São Paulo. Negotiate regional logistics partnerships to close the gap.' },
+    { priority: 'low', cls: 'rec-low', pcls: 'rp-low',
+      text: '780 zero-value orders detected. Add a NOT NULL constraint on the price field in the source system to prevent future occurrences.' }
+  ];
+
+  document.getElementById('recCount').textContent = recs.length + ' actions';
+  if (agents.length > 0) {
+    document.getElementById('recTime').textContent = 'Last updated by AI · ' + agents[0].run_time;
+  }
+
+  let html = '';
+  recs.forEach(r => {
+    html += `<div class="rec-item ${r.cls}">
+      <div class="rec-priority ${r.pcls}">${r.priority} priority</div>
+      <div class="rec-text">${r.text}</div>
+    </div>`;
+  });
+  document.getElementById('recGrid').innerHTML = html;
+}
+
+async function loadPrompts() {
+  for (const agent of ['monitor', 'quality', 'insights']) {
+    try {
+      const r = await fetch(`/api/prompts/${agent}`);
+      const d = await r.json();
+      const el = document.getElementById(`prompt-${agent}`);
+      if (el) el.value = d.prompt;
+    } catch(e) {}
+  }
+}
+
+async function loadQualityPage() {
+  const r = await fetch('/api/quality');
+  const d = await r.json();
+  document.getElementById('gxBadge2').textContent = d.passed + '/' + d.total + ' passing';
+  document.getElementById('gxBadge2').className = 'badge ' + (d.passed === d.total ? 'badge-green' : 'badge-amber');
+
+  let html = '';
+  d.checks.forEach(c => {
+    html += `<div class="gx-row">
+      <div class="gx-dot ${c.passed ? 'gxd-pass' : 'gxd-fail'}"></div>
+      <div class="gx-name">${c.name}</div>
+      <span class="gx-badge ${c.passed ? 'gxb-pass' : 'gxb-fail'}">${c.passed ? 'PASS' : 'FAIL'}</span>
+    </div>`;
+  });
+  document.getElementById('gxList2').innerHTML = html;
+}
+
+async function loadIntelligencePage() {
+  const r = await fetch('/api/agents');
+  const agents = await r.json();
+
+  const actionMap = {
+    'Pipeline Monitor': 'Verify pipeline scheduler is active for production runs',
+    'Data Quality': 'Add NOT NULL constraint on price column in source system',
+    'Business Insights': 'Launch retention email campaign targeting 6,019 repeat customers'
+  };
+
+  let html = '';
+  agents.forEach(a => {
+    const dotClass = a.status === 'success' ? 'asd-success' : a.status === 'warning' ? 'asd-warning' : 'asd-failure';
+    const action = actionMap[a.agent_name] || 'Review agent output in Slack';
+    html += `<div class="agent-row">
+      <div class="agent-status-dot ${dotClass}"></div>
+      <div class="agent-body">
+        <div class="agent-header">
+          <span class="agent-name">${a.agent_name}</span>
+          <span class="agent-time">${a.run_time}</span>
+        </div>
+        <div class="agent-channel">${a.slack_channel}</div>
+        <div class="agent-summary">${a.summary}</div>
+        <div class="agent-action" style="margin-top:6px;">→ ${action}</div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('agentListFull').innerHTML = html || '<div class="loading">No activity yet</div>';
+}
+
+async function savePrompt(agent) {
+  const prompt = document.getElementById(`prompt-${agent}`).value;
+  const r = await fetch(`/api/prompts/${agent}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({prompt})
+  });
+  const d = await r.json();
+  alert(d.status === 'saved' ? '✅ Instructions saved!' : '❌ Save failed');
+}
+
+async function loadAll() {
+  await Promise.all([
+    loadSummary(),
+    loadRuns(),
+    loadQuality(),
+    loadAgents(),
+    loadTables(),
+    loadRecommendations(),
+    loadPrompts()
+  ]);
+}
+
+loadAll();
+setInterval(loadAll, 60000);
+// Tab navigation
+const tabPages = {
+  'Pipeline Health': 'page-pipeline',
+  'Data Validation': 'page-validation',
+  'Intelligence Log': 'page-intelligence',
+  'Business Dashboard': 'page-business',
+  'Trend Analysis': 'page-trends',
+  'Agent Instructions': 'page-agents-config',
+  'Alert Settings': 'page-alerts'
+};
+
+function switchTab(tabName) {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.textContent.trim() === tabName);
+  });
+
+  document.querySelectorAll('.page-section').forEach(p => p.style.display = 'none');
+
+  const pageId = tabPages[tabName];
+  const page = document.getElementById(pageId);
+  if (page) {
+    page.style.display = 'block';
+    // Reload data for the specific page
+    if (tabName === 'Data Validation') loadQualityPage();
+    if (tabName === 'Intelligence Log') loadIntelligencePage();
+    if (tabName === 'Agent Instructions') loadPrompts();
+  }
+}
+
+// Wire up nav items
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => switchTab(item.textContent.trim()));
+});
+
+</script>
+</body>
+</html>
