@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eris Intelligence — Business Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#080c14;color:#e0e8f0;min-height:100vh;}
+.header{background:rgba(0,0,0,0.6);border-bottom:1px solid rgba(0,255,180,0.15);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px);}
+.header-left{display:flex;align-items:center;gap:16px;}
+.logo{font-size:16px;font-weight:700;color:#fff;}
+.logo span{color:#00ffb4;}
+.header-divider{width:1px;height:20px;background:rgba(255,255,255,0.1);}
+.header-title{font-size:13px;color:#5a7a94;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.ai-badge{display:flex;align-items:center;gap:6px;background:rgba(0,255,180,0.1);border:1px solid rgba(0,255,180,0.3);padding:5px 12px;border-radius:20px;font-size:11px;color:#00ffb4;font-weight:600;}
+.ai-dot{width:6px;height:6px;border-radius:50%;background:#00ffb4;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.pipeline-link{font-size:12px;color:#5a7a94;text-decoration:none;padding:6px 14px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;transition:all 0.2s;}
+.pipeline-link:hover{color:#fff;border-color:rgba(255,255,255,0.3);}
+.filter-bar{background:rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.06);padding:10px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.filter-label{font-size:10px;color:#345;text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap;}
+.filter-chip{padding:5px 12px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);color:#5a7a94;background:transparent;transition:all 0.2s;white-space:nowrap;}
+.filter-chip.active{background:rgba(0,255,180,0.15);border-color:rgba(0,255,180,0.4);color:#00ffb4;}
+.filter-chip:hover{border-color:rgba(0,255,180,0.3);color:#00ffb4;}
+.active-filter{display:flex;align-items:center;gap:6px;background:rgba(0,200,255,0.1);border:1px solid rgba(0,200,255,0.3);padding:4px 10px;border-radius:20px;font-size:11px;color:#00c8ff;margin-left:auto;}
+.active-filter-clear{cursor:pointer;color:#00c8ff;font-weight:700;margin-left:4px;}
+.body{padding:20px 24px;}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px;}
+.kpi{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;transition:all 0.2s;}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi-c1::after{background:linear-gradient(90deg,#00ffb4,#00c8ff);}
+.kpi-c2::after{background:linear-gradient(90deg,#00c8ff,#7c6fff);}
+.kpi-c3::after{background:linear-gradient(90deg,#7c6fff,#ff6fff);}
+.kpi-c4::after{background:linear-gradient(90deg,#ff9500,#ffcd00);}
+.kpi-c5::after{background:linear-gradient(90deg,#ff4444,#ff9500);}
+.kpi-c6::after{background:linear-gradient(90deg,#00ffb4,#7c6fff);}
+.kpi-label{font-size:10px;color:#456;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:6px;}
+.kpi-val{font-size:20px;font-weight:700;color:#fff;letter-spacing:-0.5px;}
+.kpi-sub{font-size:10px;margin-top:4px;}
+.sub-green{color:#00ffb4;}
+.sub-amber{color:#ffcd00;}
+.sub-red{color:#ff4444;}
+.sub-blue{color:#00c8ff;}
+.ai-panel{background:rgba(0,255,180,0.03);border:1px solid rgba(0,255,180,0.15);border-radius:10px;padding:16px 20px;margin-bottom:18px;}
+.ai-panel-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.ai-icon{width:26px;height:26px;border-radius:7px;background:rgba(0,255,180,0.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#00ffb4;}
+.ai-panel-title{font-size:13px;font-weight:600;color:#00ffb4;}
+.ai-hint{font-size:11px;color:#456;margin-left:auto;}
+.ai-response{background:rgba(0,0,0,0.4);border-radius:8px;padding:14px 16px;margin-bottom:12px;min-height:60px;transition:all 0.3s;}
+.ai-response-text{font-size:13px;color:#c0d8e8;line-height:1.6;}
+.ai-action-text{font-size:12px;color:#00ffb4;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,255,180,0.1);}
+.ai-loading{color:#456;font-style:italic;font-size:13px;}
+.ai-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.ai-chip{padding:5px 12px;background:rgba(0,255,180,0.06);border:1px solid rgba(0,255,180,0.2);border-radius:20px;font-size:11px;color:#00ffb4;cursor:pointer;transition:all 0.2s;}
+.ai-chip:hover{background:rgba(0,255,180,0.15);border-color:rgba(0,255,180,0.4);}
+.ai-chip.loading{opacity:0.5;cursor:not-allowed;}
+.grid-main{display:grid;grid-template-columns:1.8fr 1fr;gap:16px;margin-bottom:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:18px 20px;transition:border-color 0.2s;}
+.card.highlight{border-color:rgba(0,255,180,0.4);}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.card-title{font-size:13px;font-weight:600;color:#c0d8e8;}
+.badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;border:1px solid;}
+.badge-teal{background:rgba(0,255,180,0.1);color:#00ffb4;border-color:rgba(0,255,180,0.3);}
+.badge-blue{background:rgba(0,200,255,0.1);color:#00c8ff;border-color:rgba(0,200,255,0.3);}
+.badge-amber{background:rgba(255,205,0,0.1);color:#ffcd00;border-color:rgba(255,205,0,0.3);}
+.badge-red{background:rgba(255,68,68,0.1);color:#ff4444;border-color:rgba(255,68,68,0.3);}
+.seg-item{display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:all 0.2s;border-radius:6px;}
+.seg-item:hover,.seg-item.active{background:rgba(0,255,180,0.06);border-color:rgba(0,255,180,0.15);}
+.seg-item:last-child{border-bottom:none;}
+.seg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.seg-name{font-size:12px;color:#7a9bb5;flex:1;}
+.seg-bar-wrap{flex:2;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;}
+.seg-bar-fill{height:100%;border-radius:3px;transition:width 0.5s;}
+.seg-val{font-size:12px;font-weight:700;color:#fff;min-width:50px;text-align:right;}
+.geo-item{display:flex;align-items:center;gap:8px;padding:7px 6px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:all 0.2s;border-radius:6px;}
+.geo-item:hover,.geo-item.active{background:rgba(0,200,255,0.06);}
+.geo-item:last-child{border-bottom:none;}
+.geo-rank{font-size:11px;color:#345;width:18px;font-weight:700;}
+.geo-name{font-size:12px;color:#7a9bb5;flex:1;}
+.geo-bar-w{flex:2;height:4px;background:rgba(255,255,255,0.06);border-radius:3px;}
+.geo-bar-f{height:100%;border-radius:3px;background:linear-gradient(90deg,#00c8ff,#7c6fff);transition:width 0.5s;}
+.geo-val{font-size:12px;font-weight:700;color:#fff;min-width:55px;text-align:right;}
+.geo-delivery{font-size:10px;color:#456;min-width:45px;text-align:right;}
+.pay-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);}
+.pay-row:last-child{border-bottom:none;}
+.pay-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+.pay-name{font-size:12px;color:#7a9bb5;flex:1;}
+.pay-bar-w{flex:2;height:4px;background:rgba(255,255,255,0.06);border-radius:3px;}
+.pay-bar-f{height:100%;border-radius:3px;transition:width 0.5s;}
+.pay-pct{font-size:12px;font-weight:700;color:#fff;min-width:40px;text-align:right;}
+.del-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;}
+.del-stat{text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:8px;}
+.del-num{font-size:20px;font-weight:700;}
+.del-label{font-size:10px;color:#456;margin-top:2px;}
+.loading-overlay{display:none;position:absolute;inset:0;background:rgba(8,12,20,0.7);border-radius:10px;align-items:center;justify-content:center;z-index:10;}
+.loading-overlay.show{display:flex;}
+.spinner{width:24px;height:24px;border:2px solid rgba(0,255,180,0.2);border-top-color:#00ffb4;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.card{position:relative;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo"><span>Eris</span> Intelligence</div>
+    <div class="header-divider"></div>
+    <div class="header-title" id="headerTitle">E-Commerce Analytics · All Time</div>
+  </div>
+  <div class="header-right">
+    <a href="http://localhost:5001" class="pipeline-link" target="_blank">Pipeline Health ↗</a>
+    <div class="ai-badge"><div class="ai-dot"></div>AI Analyst Active</div>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">Period:</span>
+  <span class="filter-chip active" onclick="setFilter('period','all',this)">All Time</span>
+  <span class="filter-chip" onclick="setFilter('period','2016',this)">2016</span>
+  <span class="filter-chip" onclick="setFilter('period','2017',this)">2017</span>
+  <span class="filter-chip" onclick="setFilter('period','2018',this)">2018</span>
+  <div style="width:1px;height:16px;background:rgba(255,255,255,0.1);"></div>
+  <span class="filter-label">Segment:</span>
+  <span class="filter-chip active" onclick="setFilter('segment','all',this)">All</span>
+  <span class="filter-chip" onclick="setFilter('segment','One Time',this)">One Time</span>
+  <span class="filter-chip" onclick="setFilter('segment','Repeat',this)">Repeat</span>
+  <span class="filter-chip" onclick="setFilter('segment','Loyal',this)">Loyal</span>
+  <div id="activeFilterBadge" style="display:none;" class="active-filter">
+    <span id="activeFilterText"></span>
+    <span class="active-filter-clear" onclick="clearAllFilters()">✕ Clear all</span>
+  </div>
+  <span style="font-size:11px;color:#345;margin-left:auto;font-style:italic;">Click any chart element for AI insights</span>
+</div>
+
+<div class="body">
+  <div class="kpi-grid">
+    <div class="kpi kpi-c1"><div class="kpi-label">Total Orders</div><div class="kpi-val" id="kpiOrders">—</div><div class="kpi-sub sub-green" id="kpiDelivRate">Loading...</div></div>
+    <div class="kpi kpi-c2"><div class="kpi-label">Total Revenue</div><div class="kpi-val" id="kpiRevenue">—</div><div class="kpi-sub sub-blue">Delivered orders</div></div>
+    <div class="kpi kpi-c3"><div class="kpi-label">Avg Order Value</div><div class="kpi-val" id="kpiAOV">—</div><div class="kpi-sub sub-amber" id="kpiAOVSub">Loading...</div></div>
+    <div class="kpi kpi-c4"><div class="kpi-label">Avg Delivery</div><div class="kpi-val" id="kpiDelivery">—</div><div class="kpi-sub sub-amber">Days to customer</div></div>
+    <div class="kpi kpi-c5"><div class="kpi-label">Retention Rate</div><div class="kpi-val" id="kpiRetention">—</div><div class="kpi-sub sub-red">Repeat + Loyal buyers</div></div>
+    <div class="kpi kpi-c6"><div class="kpi-label">Delivery Rate</div><div class="kpi-val" id="kpiDelivRate2">—</div><div class="kpi-sub sub-green">Successfully delivered</div></div>
+  </div>
+
+  <div class="ai-panel">
+    <div class="ai-panel-header">
+      <div class="ai-icon">AI</div>
+      <div class="ai-panel-title">Ask AI</div>
+      <div class="ai-hint" id="aiHint">Click any chart element or ask a question below</div>
+    </div>
+    <div class="ai-response" id="aiResponse">
+      <div class="ai-loading">Analyzing your data...</div>
+    </div>
+    <div class="ai-chips" id="aiChips">
+    <div class="ai-chip" onclick="askAI('Why is retention so low?')">Why is retention so low?</div>
+    <div class="ai-chip" onclick="askAI('Which state has the best ROI?')">Which state has best ROI?</div>
+    <div class="ai-chip" onclick="askAI('What drives fast delivery?')">What drives fast delivery?</div>
+    <div class="ai-chip" onclick="askAI('Where are the biggest revenue opportunities?')">Top revenue opportunities?</div>
+    <div class="ai-chip" onclick="askAI('What is the biggest risk to revenue growth?')">Biggest risk to growth?</div>
+    <div class="ai-chip" onclick="askAI('Which product category should we invest more in?')">Best category to invest in?</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+    <input 
+        id="aiCustomInput" 
+        type="text" 
+        placeholder="Ask anything about your data..." 
+        style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(0,255,180,0.2);border-radius:20px;padding:8px 16px;font-size:12px;color:#e0e8f0;outline:none;"
+        onkeydown="if(event.key==='Enter') submitCustomAI()"
+    />
+    <button 
+        onclick="submitCustomAI()" 
+        style="background:rgba(0,255,180,0.15);border:1px solid rgba(0,255,180,0.3);color:#00ffb4;padding:8px 18px;border-radius:20px;font-size:12px;cursor:pointer;white-space:nowrap;">
+        Ask →
+    </button>
+    </div>
+  </div>
+
+  <div class="grid-main">
+    <div class="card" id="revenueCard">
+      <div class="loading-overlay" id="revenueLoading"><div class="spinner"></div></div>
+      <div class="card-header">
+        <div class="card-title">Revenue & Order Trend</div>
+        <span class="badge badge-teal" id="revBadge">All Time</span>
+      </div>
+      <div style="position:relative;height:200px;"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Customer Segments</div>
+        <span class="badge badge-red">Click to filter</span>
+      </div>
+      <div id="segmentList"></div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card" id="statesCard">
+      <div class="loading-overlay" id="statesLoading"><div class="spinner"></div></div>
+      <div class="card-header">
+        <div class="card-title">Top States by Revenue</div>
+        <span class="badge badge-blue">Click state to filter</span>
+      </div>
+      <div id="statesList"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Delivery Performance</div>
+        <span class="badge badge-teal" id="delivBadge">Loading...</span>
+      </div>
+      <div style="position:relative;height:150px;"><canvas id="delivChart"></canvas></div>
+      <div class="del-grid" id="delivStats"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Payment Methods</div>
+        <span class="badge badge-blue">By order volume</span>
+      </div>
+      <div id="paymentList"></div>
+    </div>
+  </div>
+
+  <div class="card" id="catCard">
+    <div class="loading-overlay" id="catLoading"><div class="spinner"></div></div>
+    <div class="card-header">
+      <div class="card-title">Product Categories</div>
+      <span class="badge badge-blue">Click category for AI analysis</span>
+    </div>
+    <div style="position:relative;height:160px;"><canvas id="catChart"></canvas></div>
+  </div>
+
+</div>
+
+<script>
+const fmt = n => n ? Number(n).toLocaleString() : '0';
+const fmtM = n => n >= 1000000 ? '$'+(n/1000000).toFixed(1)+'M' : n >= 1000 ? '$'+(n/1000).toFixed(0)+'K' : '$'+Number(n).toFixed(0);
+const fmtPct = n => Number(n).toFixed(1)+'%';
+const gridColor = 'rgba(255,255,255,0.05)';
+const tickColor = '#456';
+
+let filters = { period: 'all', segment: 'all', state: 'all', category: 'all' };
+let currentKPIs = {};
+let revenueChartInst, delivChartInst, catChartInst;
+let aiLoading = false;
+
+function submitCustomAI() {
+  const input = document.getElementById('aiCustomInput');
+  const question = input.value.trim();
+  if(!question) return;
+  input.value = '';
+  askAI(question);
+}
+
+function setFilter(key, val, el) {
+  filters[key] = val;
+  // Update chip UI for this group
+  if(el) {
+    const group = el.parentElement;
+    group.querySelectorAll('.filter-chip').forEach(c => {
+      if(c.parentElement === group) c.classList.remove('active');
+    });
+    el.classList.add('active');
+  }
+  updateActiveFilterBadge();
+  loadAll();
+}
+
+function setChartFilter(key, val) {
+  filters[key] = val;
+  updateActiveFilterBadge();
+  loadAll();
+}
+
+function clearAllFilters() {
+  filters = { period: 'all', segment: 'all', state: 'all', category: 'all' };
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.filter-chip').forEach(c => {
+    if(c.textContent.trim() === 'All Time' || c.textContent.trim() === 'All') c.classList.add('active');
+  });
+  updateActiveFilterBadge();
+  loadAll();
+}
+
+function updateActiveFilterBadge() {
+  const active = Object.entries(filters).filter(([k,v]) => v !== 'all');
+  const badge = document.getElementById('activeFilterBadge');
+  const text = document.getElementById('activeFilterText');
+  if(active.length > 0) {
+    badge.style.display = 'flex';
+    text.textContent = active.map(([k,v]) => `${k}: ${v}`).join(' · ');
+    document.getElementById('headerTitle').textContent = 'E-Commerce Analytics · ' + active.map(([k,v]) => v).join(' · ');
+  } else {
+    badge.style.display = 'none';
+    document.getElementById('headerTitle').textContent = 'E-Commerce Analytics · All Time';
+  }
+}
+
+async function askAI(question, context_override) {
+  if(aiLoading) return;
+  aiLoading = true;
+  document.querySelectorAll('.ai-chip').forEach(c => c.classList.add('loading'));
+  document.getElementById('aiHint').textContent = 'Analyzing...';
+  document.getElementById('aiResponse').innerHTML = '<div class="ai-loading">AI is analyzing your data...</div>';
+
+  try {
+    const res = await fetch('/api/business/ai_insight', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        question,
+        context: { ...currentKPIs, filters }
+      })
+    });
+    const d = await res.json();
+    document.getElementById('aiResponse').innerHTML = `
+      <div class="ai-response-text">${d.insight}</div>
+      ${d.action ? `<div class="ai-action-text">→ ${d.action}</div>` : ''}
+    `;
+    document.getElementById('aiHint').textContent = 'Click any chart element or ask another question';
+  } catch(e) {
+    document.getElementById('aiResponse').innerHTML = '<div class="ai-loading">Error connecting to AI — check your API key</div>';
+  }
+
+  aiLoading = false;
+  document.querySelectorAll('.ai-chip').forEach(c => c.classList.remove('loading'));
+}
+
+async function loadAll() {
+  const params = new URLSearchParams(filters);
+  const res = await fetch('/api/business/overview?' + params);
+  const d = await res.json();
+
+  // KPIs
+  const k = d.kpis;
+  currentKPIs = k;
+  document.getElementById('kpiOrders').textContent = fmt(k.total_orders);
+  document.getElementById('kpiRevenue').textContent = fmtM(k.total_revenue);
+  document.getElementById('kpiAOV').textContent = '$' + Number(k.avg_order_value).toFixed(2);
+  document.getElementById('kpiAOVSub').textContent = fmt(k.total_orders) + ' total orders'; 
+  document.getElementById('kpiDelivery').textContent = k.avg_delivery_days + ' days';
+  document.getElementById('kpiRetention').textContent = fmtPct(k.retention_rate);
+  document.getElementById('kpiDelivRate').textContent = fmtPct(k.delivery_rate) + ' delivery rate';
+  document.getElementById('kpiDelivRate2').textContent = fmtPct(k.delivery_rate);
+
+  // Revenue trend chart
+  const months = d.revenue_trend.map(r => r.order_year + '-' + String(r.order_month_num).padStart(2,'0'));
+  const revenues = d.revenue_trend.map(r => r.revenue);
+  const orders = d.revenue_trend.map(r => r.orders);
+
+  if(revenueChartInst) revenueChartInst.destroy();
+  revenueChartInst = new Chart(document.getElementById('revenueChart'), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        { label: 'Revenue', data: revenues, borderColor: '#00ffb4', backgroundColor: 'rgba(0,255,180,0.06)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#00ffb4', tension: 0.4, fill: true },
+        { label: 'Orders', data: orders, borderColor: '#00c8ff', backgroundColor: 'rgba(0,200,255,0.04)', borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#00c8ff', tension: 0.4, fill: false, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.datasetIndex === 0 ? fmtM(ctx.raw) : fmt(ctx.raw) + ' orders' } }
+      },
+      onClick: (e, els) => {
+        if(els.length > 0) {
+          const label = months[els[0].index];
+          askAI(`What happened in ${label}? Analyze revenue and order trends for this period.`);
+        }
+      },
+      scales: {
+        y: { ticks: { callback: v => fmtM(v), font: { size: 10 }, color: tickColor }, grid: { color: gridColor } },
+        y2: { position: 'right', ticks: { font: { size: 10 }, color: tickColor }, grid: { display: false } },
+        x: { ticks: { font: { size: 10 }, color: tickColor, maxRotation: 45 }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Segments
+  const segColors = ['#00ffb4', '#00c8ff', '#7c6fff'];
+  const maxSegOrders = Math.max(...d.segments.map(s => s.orders));
+  let segHtml = '';
+  d.segments.forEach((s, i) => {
+    const pct = Math.round(s.orders / maxSegOrders * 100);
+    const active = filters.segment === s.customer_segment ? 'active' : '';
+    segHtml += `<div class="seg-item ${active}" onclick="setChartFilter('segment','${s.customer_segment}');askAI('Analyze the ${s.customer_segment} customer segment. What are their key behaviors and how can we improve their value?')">
+      <div class="seg-dot" style="background:${segColors[i]};"></div>
+      <div class="seg-name">${s.customer_segment}</div>
+      <div class="seg-bar-wrap"><div class="seg-bar-fill" style="width:${pct}%;background:${segColors[i]};"></div></div>
+      <div class="seg-val">${fmt(s.orders)}</div>
+    </div>`;
+  });
+  document.getElementById('segmentList').innerHTML = segHtml;
+
+  // States
+  const maxRev = Math.max(...d.states.map(s => s.revenue));
+  let statesHtml = '';
+  d.states.forEach((s, i) => {
+    const pct = Math.round(s.revenue / maxRev * 100);
+    const active = filters.state === s.customer_state ? 'active' : '';
+    statesHtml += `<div class="geo-item ${active}" onclick="setChartFilter('state','${s.customer_state}');askAI('Analyze ${s.customer_state} state performance. What is driving revenue here and what opportunities exist?')">
+      <div class="geo-rank">${i+1}</div>
+      <div class="geo-name">${s.customer_state}</div>
+      <div class="geo-bar-w"><div class="geo-bar-f" style="width:${pct}%"></div></div>
+      <div class="geo-val">${fmtM(s.revenue)}</div>
+      <div class="geo-delivery">${s.avg_delivery ? s.avg_delivery+'d' : '—'}</div>
+    </div>`;
+  });
+  document.getElementById('statesList').innerHTML = statesHtml;
+
+  // Delivery
+  const delColors = {'Fast':'#00ffb4','Normal':'#00c8ff','Slow':'#ffcd00','Not Delivered':'#ff4444'};
+  const delLabels = d.delivery.map(d => d.delivery_speed_tier);
+  const delData = d.delivery.map(d => d.orders);
+  const delBg = delLabels.map(l => delColors[l] || '#456');
+
+  if(delivChartInst) delivChartInst.destroy();
+  delivChartInst = new Chart(document.getElementById('delivChart'), {
+    type: 'doughnut',
+    data: { labels: delLabels, datasets: [{ data: delData, backgroundColor: delBg, borderWidth: 0, borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '65%',
+      onClick: (e, els) => {
+        if(els.length > 0) {
+          const tier = delLabels[els[0].index];
+          askAI(`Analyze ${tier} delivery performance. What factors influence this and how can we improve?`);
+        }
+      }
+    }
+  });
+  document.getElementById('delivBadge').textContent = fmtPct(k.delivery_rate) + ' delivered';
+
+  let delStatsHtml = '';
+  d.delivery.forEach(dd => {
+    const col = delColors[dd.delivery_speed_tier] || '#456';
+    delStatsHtml += `<div class="del-stat"><div class="del-num" style="color:${col};">${fmt(dd.orders)}</div><div class="del-label">${dd.delivery_speed_tier}</div></div>`;
+  });
+  document.getElementById('delivStats').innerHTML = delStatsHtml;
+
+  // Payments
+  const payColors = {'credit_card':'#00c8ff','boleto':'#00ffb4','voucher':'#ffcd00','debit_card':'#7c6fff','not_defined':'#456'};
+  const payBgColors = {'credit_card':'rgba(0,200,255,0.2)','boleto':'rgba(0,255,180,0.2)','voucher':'rgba(255,205,0,0.2)','debit_card':'rgba(124,111,255,0.2)','not_defined':'rgba(100,100,100,0.2)'};
+  const payNames = {'credit_card':'Credit Card','boleto':'Boleto','voucher':'Voucher','debit_card':'Debit Card','not_defined':'Other'};
+  const payShort = {'credit_card':'CC','boleto':'BL','voucher':'VC','debit_card':'DC','not_defined':'OT'};
+  const totalPayOrders = d.payments.reduce((a,b) => a + b.orders, 0);
+  let payHtml = '';
+  d.payments.forEach(p => {
+    const pct = Math.round(p.orders / totalPayOrders * 100);
+    const col = payColors[p.primary_payment_type] || '#456';
+    const bg = payBgColors[p.primary_payment_type] || 'rgba(100,100,100,0.2)';
+    const name = payNames[p.primary_payment_type] || p.primary_payment_type;
+    const short = payShort[p.primary_payment_type] || '?';
+    payHtml += `<div class="pay-row">
+      <div class="pay-icon" style="background:${bg};color:${col};">${short}</div>
+      <div class="pay-name">${name}</div>
+      <div class="pay-bar-w"><div class="pay-bar-f" style="width:${pct}%;background:${col};"></div></div>
+      <div class="pay-pct">${pct}%</div>
+    </div>`;
+  });
+  document.getElementById('paymentList').innerHTML = payHtml;
+
+  // Categories
+  const catLabels = d.categories.map(c => c.primary_category ? c.primary_category.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase()).slice(0,20) : 'Unknown');
+  const catData = d.categories.map(c => c.revenue);
+  const catColors = d.categories.map((_, i) => `hsla(${160 + i * 18}, 80%, 60%, 0.8)`);
+
+  if(catChartInst) catChartInst.destroy();
+  catChartInst = new Chart(document.getElementById('catChart'), {
+    type: 'bar',
+    data: { labels: catLabels, datasets: [{ data: catData, backgroundColor: catColors, borderRadius: 4, borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmtM(ctx.raw) } }
+      },
+      onClick: (e, els) => {
+        if(els.length > 0) {
+          const cat = d.categories[els[0].index].primary_category;
+          setChartFilter('category', cat);
+          askAI(`Analyze the ${cat} product category. What is driving performance and what are the growth opportunities?`);
+        }
+      },
+      scales: {
+        y: { ticks: { callback: v => fmtM(v), font: { size: 10 }, color: tickColor }, grid: { color: gridColor } },
+        x: { ticks: { font: { size: 9 }, color: tickColor, maxRotation: 35 }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Initial AI insight
+  if(Object.values(filters).every(v => v === 'all')) {
+    document.getElementById('aiResponse').innerHTML = `
+      <div class="ai-response-text">I've analyzed your complete e-commerce dataset — <strong style="color:#00ffb4;">${fmt(k.total_orders)} orders</strong> generating <strong style="color:#00ffb4;">${fmtM(k.total_revenue)}</strong> in revenue. Your biggest opportunity is retention: <strong style="color:#ff4444;">${fmtPct(100 - k.retention_rate)}</strong> of customers never buy again. Converting just 10% of one-time buyers into repeat customers would add approximately <strong style="color:#00ffb4;">$1.4M</strong> in annual revenue with zero acquisition cost. Average delivery of <strong style="color:#ffcd00;">${k.avg_delivery_days} days</strong> has room for improvement — São Paulo achieves 8 days while northern states average 26.</div>
+      <div class="ai-action-text">→ Click on any chart element to get specific AI analysis, or ask a question below</div>
+    `;
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>

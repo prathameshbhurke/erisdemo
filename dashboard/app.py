@@ -4,13 +4,14 @@ import redshift_connector
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import threading
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)   
 
 REDSHIFT_CONFIG = {
     'host': os.getenv("REDSHIFT_HOST"),
@@ -266,6 +267,22 @@ def tables():
 @app.route('/')
 def index():
     return render_template('pipeline.html')
+
+
+def keep_redshift_warm():
+    """Ping Redshift every 5 minutes to prevent auto-pause"""
+    import time
+    while True:
+        try:
+            query_one("SELECT 1 as ping")
+            print("✅ Redshift keepalive ping")
+        except:
+            pass
+        time.sleep(300)  # every 5 minutes
+
+# Start keepalive thread
+warm_thread = threading.Thread(target=keep_redshift_warm, daemon=True)
+warm_thread.start()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
