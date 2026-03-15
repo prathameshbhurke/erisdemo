@@ -8,6 +8,20 @@ import great_expectations as gx
 import sys
 sys.path.insert(0, '/usr/local/airflow/dags')
 from ai_report import run_ai_report
+from airflow.utils.state import DagRunState
+
+t_wait_for_ingestion = ExternalTaskSensor(
+    task_id='wait_for_olist_ingestion',
+    external_dag_id='olist_ingestion',
+    external_task_id=None,
+    allowed_states=[DagRunState.SUCCESS],
+    failed_states=[DagRunState.FAILED],
+    execution_delta=timedelta(minutes=30),
+    timeout=3600,
+    poke_interval=60,
+    mode='poke'
+)
+
 
 # Default settings for all tasks
 default_args = {

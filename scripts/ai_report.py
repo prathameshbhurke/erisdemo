@@ -6,20 +6,15 @@ import json
 import sendgrid
 from sendgrid.helpers.mail import Mail
 from datetime import datetime
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
+# No load_dotenv needed — env vars injected by Airflow Docker
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# API Keys from environment variables
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
 TO_EMAIL = os.getenv("SENDGRID_TO_EMAIL")
 
-# Redshift connection from environment variables
 REDSHIFT_CONFIG = {
     'host': os.getenv("REDSHIFT_HOST"),
     'database': os.getenv("REDSHIFT_DB"),
@@ -29,30 +24,72 @@ REDSHIFT_CONFIG = {
 }
 
 def get_pipeline_stats():
-    """Pull key metrics from Redshift"""
+    """Pull key metrics from rpt_olist_orders"""
     conn = redshift_connector.connect(**REDSHIFT_CONFIG)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM fct_orders")
+    # Total orders
+    cursor.execute("SELECT COUNT(*) FROM rpt_olist_orders")
     total_orders = cursor.fetchone()[0]
 
+    # Orders by status
     cursor.execute("""
-        SELECT status, COUNT(*) as count
-        FROM fct_orders
-        GROUP BY status
+        SELECT order_status, COUNT(*) as count
+        FROM rpt_olist_orders
+        GROUP BY order_status
+        ORDER BY count DESC
     """)
     status_breakdown = cursor.fetchall()
 
-    cursor.execute("SELECT ROUND(SUM(order_amount), 2) FROM fct_orders WHERE is_completed = true")
+    # Total revenue
+    cursor.execute("SELECT ROUND(SUM(total_order_value), 2) FROM rpt_olist_orders WHERE is_delivered = true")
     total_revenue = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM fct_orders WHERE order_id IS NULL")
+    # Average order value
+    cursor.execute("SELECT ROUND(AVG(total_order_value), 2) FROM rpt_olist_orders WHERE is_delivered = true")
+    avg_order_value = cursor.fetchone()[0]
+
+    # Delivery performance
+    cursor.execute("""
+        SELECT delivery_speed_tier, COUNT(*) as count
+        FROM rpt_olist_orders
+        WHERE is_delivered = true
+        GROUP BY delivery_speed_tier
+        ORDER BY count DESC
+    """)
+    delivery_breakdown = cursor.fetchall()
+
+    # Average days to deliver
+    cursor.execute("SELECT ROUND(AVG(days_to_deliver), 1) FROM rpt_olist_orders WHERE is_delivered = true")
+    avg_days_to_deliver = cursor.fetchone()[0]
+
+    # Customer segments
+    cursor.execute("""
+        SELECT customer_segment, COUNT(*) as count
+        FROM rpt_olist_orders
+        GROUP BY customer_segment
+        ORDER BY count DESC
+    """)
+    customer_segments = cursor.fetchall()
+
+    # Payment methods
+    cursor.execute("""
+        SELECT primary_payment_type, COUNT(*) as count
+        FROM rpt_olist_orders
+        GROUP BY primary_payment_type
+        ORDER BY count DESC
+    """)
+    payment_breakdown = cursor.fetchall()
+
+    # Null checks
+    cursor.execute("SELECT COUNT(*) FROM rpt_olist_orders WHERE order_id IS NULL")
     null_order_ids = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM fct_orders WHERE customer_name IS NULL")
+    cursor.execute("SELECT COUNT(*) FROM rpt_olist_orders WHERE customer_id IS NULL")
     null_customers = cursor.fetchone()[0]
 
-    cursor.execute("SELECT MAX(order_date) FROM fct_orders")
+    # Latest order date
+    cursor.execute("SELECT MAX(ordered_at) FROM rpt_olist_orders")
     latest_order = cursor.fetchone()[0]
 
     conn.close()
@@ -61,12 +98,17 @@ def get_pipeline_stats():
         "total_orders": total_orders,
         "status_breakdown": status_breakdown,
         "total_revenue": float(total_revenue) if total_revenue else 0,
+        "avg_order_value": float(avg_order_value) if avg_order_value else 0,
+        "delivery_breakdown": delivery_breakdown,
+        "avg_days_to_deliver": float(avg_days_to_deliver) if avg_days_to_deliver else 0,
+        "customer_segments": customer_segments,
+        "payment_breakdown": payment_breakdown,
         "null_order_ids": null_order_ids,
         "null_customers": null_customers,
         "latest_order_date": str(latest_order),
         "pipeline_run_time": datetime.now().strftime('%Y-%m-%d %H:%M'),
-        "quality_checks_passed": 4,
-        "quality_checks_total": 4
+        "quality_checks_passed": 13,
+        "quality_checks_total": 13
     }
 
 def generate_ai_report(stats):
@@ -74,10 +116,10 @@ def generate_ai_report(stats):
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     prompt = f"""
-You are a data pipeline assistant for an e-commerce company.
+You are a data pipeline assistant for an e-commerce company called Olist.
 Generate a concise, friendly daily pipeline health report based on these stats.
 Write it as if you are sending it to a non-technical business owner.
-Keep it under 200 words. Highlight any concerns clearly.
+Keep it under 250 words. Highlight any concerns clearly.
 Format it nicely for an email with clear sections.
 
 Pipeline Stats:
@@ -85,15 +127,20 @@ Pipeline Stats:
 
 Format the report with:
 - A brief greeting with today's date
-- Pipeline status (success/failure)
-- Key data highlights (orders, revenue, quality)
-- Any anomalies or things to watch
+- Pipeline status (success)
+- Key business highlights:
+  * Total orders and revenue
+  * Delivery performance (fast/normal/slow breakdown)
+  * Customer segment breakdown (one time vs repeat vs loyal)
+  * Top payment method
+- Data quality summary ({stats['quality_checks_passed']}/{stats['quality_checks_total']} checks passed)
+- One key insight or recommendation based on the data
 - Next scheduled run
 """
 
     message = client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=500,
+        max_tokens=600,
         messages=[{"role": "user", "content": prompt}]
     )
 
@@ -107,7 +154,7 @@ def send_email(report, stats):
     <html>
     <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #2E4B8F; padding: 20px; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">📊 Daily Pipeline Report</h1>
+            <h1 style="color: white; margin: 0;">📊 Daily Olist Pipeline Report</h1>
             <p style="color: #ccc; margin: 5px 0 0 0;">{datetime.now().strftime('%B %d, %Y')}</p>
         </div>
 
@@ -122,11 +169,19 @@ def send_email(report, stats):
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr style="background-color: #f0f4ff;">
                         <td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Orders</strong></td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">{stats['total_orders']}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{stats['total_orders']:,}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Revenue</strong></td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${stats['total_revenue']}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${stats['total_revenue']:,.2f}</td>
+                    </tr>
+                    <tr style="background-color: #f0f4ff;">
+                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>Avg Order Value</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${stats['avg_order_value']:,.2f}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>Avg Days to Deliver</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{stats['avg_days_to_deliver']} days</td>
                     </tr>
                     <tr style="background-color: #f0f4ff;">
                         <td style="padding: 8px; border: 1px solid #ddd;"><strong>Quality Checks</strong></td>
@@ -154,7 +209,7 @@ def send_email(report, stats):
     message = Mail(
         from_email=FROM_EMAIL,
         to_emails=TO_EMAIL,
-        subject=f"📊 Daily Pipeline Report — {datetime.now().strftime('%B %d, %Y')}",
+        subject=f"📊 Daily Olist Pipeline Report — {datetime.now().strftime('%B %d, %Y')}",
         html_content=html_content
     )
 

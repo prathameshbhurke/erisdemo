@@ -33,4 +33,7 @@ config/secrets.yml
 .vscode/settings.json
 
 # Great Expectations
-great_expectations/uncommitted/
+great_expectations/uncommitted/__pycache__/
+*.pyc
+__pycache__/
+*.pyc
